@@ -1,10 +1,21 @@
 # Sauce Demo QA Automation Assessment
 
+## Overview
+
+This repository contains the Playwright UI automation suite for the Sauce Demo public practice store, prepared for the Harvee Technologies QA Automation Tester assessment.
+
+The suite uses **Playwright with TypeScript** and follows the **Page Object Model (POM)**. It covers the main login, session, product sorting, cart, and checkout flows.
+
+The automation targets the public practice site only. It does not interact with any production store or real payment service.
+
 ## Scope and assumptions
 
-This repository contains the UI automation portion of the QA Automation assessment for the public Sauce Demo practice store only. It does not target any other live system. The base URL and published practice-user credentials are configurable through environment variables; defaults are provided for the public practice site.
-
-Assumptions: checkout accepts any non-empty postal code because no format rule is stated; the overview page's displayed subtotal, tax, and total are the values under test; a successful order empties the cart; and a logged-out visitor is redirected to login when opening the inventory URL directly.
+- The base URL and practice-user credentials can be configured through environment variables.
+- The default configuration targets the public Sauce Demo practice site and its published practice accounts.
+- Checkout accepts a non-empty postal code because no country-specific validation rule is defined in the assessment.
+- The checkout overview's displayed item subtotal, tax, and total are treated as the values under test.
+- A completed order should display a confirmation and leave the cart empty.
+- A logged-out user should be redirected to the login page when opening the inventory URL directly.
 
 ## Requirements
 
@@ -13,39 +24,99 @@ Assumptions: checkout accepts any non-empty postal code because no format rule i
 
 ## Setup
 
+Install the dependencies from the lockfile:
+
 ```bash
 npm ci
+```
+
+Install the Chromium browser used by the configured test project:
+
+```bash
 npx playwright install chromium
 ```
 
-Optionally copy `.env.example` to `.env` and override `BASE_URL`, `STANDARD_USER`, `LOCKED_USER`, or `PASSWORD`. Do not commit `.env` or real credentials.
+On Linux CI agents that need Playwright system dependencies, use:
 
-## Run
+```bash
+npx playwright install --with-deps chromium
+```
+
+## Configuration
+
+The repository includes `.env.example` as a reference for local configuration.
+
+For local overrides, copy it to `.env` and update the values as required:
+
+```bash
+# macOS / Linux
+cp .env.example .env
+
+# Windows PowerShell
+Copy-Item .env.example .env
+```
+
+Available settings:
+
+- `BASE_URL` — application base URL
+- `STANDARD_USER` — valid practice account
+- `LOCKED_USER` — locked practice account
+- `PASSWORD` — practice account password
+
+Do not commit `.env`, real credentials, or other secrets. The `.env` file is excluded by `.gitignore`.
+
+## Run the tests
+
+Type-check the TypeScript project:
 
 ```bash
 npm run typecheck
+```
+
+Run the complete test suite:
+
+```bash
 npm test
 ```
 
-Run with a visible browser:
+Run tests with a visible browser:
 
 ```bash
 npm run test:headed
 ```
 
-Open the HTML report:
+Run a specific test by title, for example:
+
+```bash
+npx playwright test -g "TC14"
+```
+
+## Reports and failure artifacts
+
+The Playwright configuration produces:
+
+- **HTML report:** `playwright-report/`
+- **JUnit XML report:** `test-results/junit.xml`
+- **Screenshots:** captured on test failure
+- **Traces:** retained on test failure
+
+Open the HTML report after a test run:
 
 ```bash
 npm run report
 ```
 
-The suite writes an HTML report to `playwright-report/`, JUnit XML to `test-results/junit.xml`, and captures screenshots plus traces on failure. Generated reports and test artifacts are intentionally excluded from Git.
+The report and test-artifact folders are generated during execution and are excluded from Git. Run the tests before opening the report.
 
-Each test starts from its own browser context and establishes the state it needs, so tests can run independently and in any order. The missing-checkout-field cases are generated as separate data-driven tests from one scenario table.
+## Test design
+
+Each test uses its own Playwright browser context and establishes the state it needs, so tests can run independently and in any order.
+
+The suite uses page objects for reusable page locators and actions. The required-checkout-field scenarios are data-driven: the missing first name, last name, and postal code are exercised as separate test cases.
 
 ## Manual case to automated test mapping
 
-| Manual ID | Automated test |
+| Manual ID | Automated test / coverage |
 |---|---|
 | TC01 | `TC01 standard user logs in` |
 | TC02 | `TC02 locked out user sees the expected error` |
@@ -63,20 +134,46 @@ Each test starts from its own browser context and establishes the state it needs
 | TC14 | `TC14 full checkout reconciles total and empties the cart` |
 | TC15 | Three data-driven tests: missing first name, last name, and postal code |
 | TC16–TC19 | Manual only |
-| TC20 | Manual responsive viewport observation; URL guard is covered by TC06 |
+| TC20 | Manual responsive viewport check; the logged-out URL guard is covered by TC06 |
 | TC21–TC22 | Manual only |
-
-## Growing the suite to 200 tests
-
-I would keep page objects focused and move repeated setup, test data, and assertions into fixtures and helper functions. I would organize cases by feature and risk, add API or unit tests for rules that do not need a browser, and use data-driven tests for combinations such as sort direction, required fields, and user permissions. Before increasing parallelism, I would verify test-data isolation and the practice site's capacity. CI would run a fast smoke set on every change and the wider suite on a schedule or release candidate. I would investigate flaky tests rather than masking them with retries, and retain traces and reports to support diagnosis.
 
 ## Project structure
 
-- `tests/pages/` — Page Object Model classes and locators.
-- `tests/support/` — shared environment configuration and TypeScript environment declaration.
-- `tests/shop-checkout.spec.ts` — UI test scenarios.
-- `playwright.config.ts` — browser and reporting configuration.
-- `.env.example` — configurable values; copy to `.env` for local overrides.
-- `AI_USAGE.md` — disclosure of AI assistance and human review.
+```text
+.
+├── tests/
+│   ├── pages/
+│   │   ├── cart.page.ts
+│   │   ├── checkout.page.ts
+│   │   ├── inventory.page.ts
+│   │   └── login.page.ts
+│   ├── support/
+│   │   └── test-config.ts
+│   └── shop-checkout.spec.ts
+├── .env.example
+├── .gitignore
+├── .nvmrc
+├── AI_USAGE.md
+├── package.json
+├── package-lock.json
+├── playwright.config.ts
+├── README.md
+└── tsconfig.json
+```
 
-The default run targets Chromium. Firefox and WebKit can be added once the supported browser matrix is confirmed.
+- `tests/pages/` — Page Object Model classes, locators, and page actions.
+- `tests/support/test-config.ts` — environment-variable loading and shared test configuration.
+- `tests/shop-checkout.spec.ts` — automated test scenarios.
+- `playwright.config.ts` — test discovery, browser, retries, traces, screenshots, and reporters.
+- `.env.example` — example environment configuration.
+- `AI_USAGE.md` — disclosure of AI assistance and the human review performed.
+
+Node.js type definitions are supplied by the `@types/node` development dependency. No custom global declaration file is required.
+
+The default run targets Chromium. Firefox and WebKit can be added when the supported browser matrix is confirmed.
+
+## Scaling the suite
+
+To grow the suite, keep page objects focused and move repeated setup, test data, and assertions into fixtures and helper functions. Organize cases by feature and risk, and use data-driven tests for combinations such as sort direction, required fields, and user permissions. Add API or unit tests for rules that do not need a browser.
+
+Before increasing parallelism, verify test-data isolation and the practice site's capacity. In CI, run a fast smoke set on every change and the wider suite on a schedule or release candidate. Investigate flaky tests rather than masking them with retries, and retain traces and reports to support diagnosis.
